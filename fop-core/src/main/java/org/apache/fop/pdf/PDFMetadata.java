@@ -19,9 +19,14 @@
 
 package org.apache.fop.pdf;
 
+import java.io.ByteArrayOutputStream;
+import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.Objects;
 import java.util.UUID;
 
 import javax.xml.transform.TransformerConfigurationException;
@@ -99,7 +104,7 @@ public class PDFMetadata extends PDFStream {
     /** {@inheritDoc} */
     protected void outputRawStreamData(OutputStream out) throws IOException {
         try {
-            XMPSerializer.writeXMPPacket(xmpMetadata, out, this.readOnly);
+            XMPSerializer.writeXMPPacket(xmpMetadata, new LineEndingOutputStream(out), this.readOnly);
         } catch (TransformerConfigurationException tce) {
             throw new IOException("Error setting up Transformer for XMP stream serialization: "
                     + tce.getMessage());
@@ -273,6 +278,40 @@ public class PDFMetadata extends PDFStream {
         if (d != null) { //ModifyDate is only required for PDF/X
             xmpBasic.setModifyDate(d);
             info.setModDate(d);
+        }
+    }
+
+    /**
+     * Replaces all CRLF line endings with LF line endings.
+     */
+    private static final class LineEndingOutputStream extends FilterOutputStream {
+        private boolean lastWasCR = false;
+
+        /**
+         * @param originalOut original output stream.
+         */
+        LineEndingOutputStream(OutputStream originalOut) {
+            super(originalOut);
+        }
+
+        @Override
+        public void write(int b) throws IOException {
+            if (b == '\r') {
+                lastWasCR = true;
+            } else if (b == '\n') {
+                if (lastWasCR) {
+                    out.write('\n');
+                    lastWasCR = false;
+                } else {
+                    out.write('\n');
+                }
+            } else {
+                if (lastWasCR) {
+                    out.write('\n');
+                    lastWasCR = false;
+                }
+                out.write(b);
+            }
         }
     }
 }
